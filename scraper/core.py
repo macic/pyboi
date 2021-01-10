@@ -2,8 +2,8 @@ import numpy as np
 from binance.client import Client
 from config.base import api_key, api_secret
 from sqlalchemy.types import DateTime, Numeric
-from utils.session import engine
-from utils.dataframe_manipulation import np_array_to_ohlc_df
+from utils.database import engine
+from utils.statistical import np_array_to_ohlc_df
 from utils.logger import logger
 
 client = Client(api_key, api_secret)
