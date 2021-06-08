@@ -6,48 +6,91 @@ from binance.client import Client
 from time import time
 api_key = os.getenv('binance_key')
 api_secret = os.getenv('binance_secret')
-client = Client(api_key, api_secret)
+#client = Client(api_key, api_secret)
 
+#x=client.get_asset_balance('EUR')
+#print(float(x.get('free', 0)))
 from utils.database import session_scope, engine
 from models.symbol import Etheur
-#configure_mappers()
+
+
 with session_scope() as session:
 
-    start = time()
     pandas_data = pd.read_sql_table('etheur', engine)
-    end = time()
-    print("pandas", end - start)
-    # start = time()
     # data = Etheur.get_from_last_year()
-    # end = time()
-    # print("DB", end - start)
 
+    pandas_data = pandas_data.sort_values(by=['ts'])
     pandas_data.index = pd.to_datetime(pandas_data.ts, unit='s')
     #pandas_data.ts = pandas_data.index
 
-    print(pandas_data)
 
     df = pandas_data.resample('D').agg({'open': 'first',
                            'high': 'max',
                            'low': 'min',
                            'close': 'last',
                            'volume': 'sum'})
-    print(df)
+    #print(df)
 
+    index_names = pandas_data[(pandas_data['ts'] < '2021-01-13 00:00:00')].index
 
+    # drop these given row
+    # indexes from dataFrame
+    pandas_data.drop(index_names, inplace=True)
 
+    from talib.abstract import *
+    import talib
+    #candle_indicator = CDLMARUBOZU(df)
+    candle_indicator = CDLENGULFING(pandas_data)
+    print("pattern detection")
+    for index, value in candle_indicator.items():
+        if value!=0:
+            print(index, value)
+    #raise
+    df = pandas_data
+    indicator = KAMA(df, 10, 2, 30)
+    indicator_2 = KAMA(df, 20, 2, 30)
+    #indicator = SMA(df, 25)
+    bbands= BBANDS(df, 20, 2.0, 2.0)
+    #print(indicator)
+    #print(bbands)
     hovertext = []
     for i in range(len(df['open'])):
-        hovertext.append('Open: ' + str(df['open'][i]) + '<br>High: ' + str(df['high'][i])+ '<br>low: ' + str(df['low'][i])+ '<br>Close: ' + str(df['close'][i]))
+        hovertext.append('Open: ' + str(df['open'][i]) + '<br>High: ' + str(df['high'][i])+ '<br>Low: ' + str(df['low'][i])+ '<br>Close: ' + str(df['close'][i]))
 
-    fig = go.Figure(data=go.Candlestick(x=df.index,
-                                 open=df['open'],
-                                 high=df['high'],
-                                 low=df['low'],
-                                 close=df['close'],
-                                 text=hovertext,
-                                 hoverinfo='text'))
+    set1 = dict(x=df.index,
+                open=df['open'],
+                high=df['high'],
+                low=df['low'],
+                close=df['close'],
+                text=hovertext,
+                hoverinfo='text',
+                type='candlestick')
+    set2= {'x': bbands.index,
+           'y': bbands['upperband'],
+           'type': 'scatter',
+           'mode': 'lines',
+           'line': {'width': 1, 'color': 'blue'},
+           'name': 'BBAnds upper'}
+    set3 = {'x': indicator.index,
+            'y': indicator,
+            'type': 'scatter',
+            'mode': 'lines',
+            'line': {'width': 1, 'color': 'orange'},
+            'name': 'KAMA'}
+
+    set4 = {'x': indicator_2.index,
+            'y': indicator_2,
+            'type': 'scatter',
+            'mode': 'lines',
+            'line': {'width': 1, 'color': 'navy'},
+            'name': 'KAMA'}
+    layout = go.Layout({'title':'ETHEUR Daily', 'font': {'size': 25}})
+    data=[set1, set3, set4]
+    fig = go.Figure(data=data, layout=layout)
     fig.show()
+
+
+
     #print(session.query(Etheur).first())
     #print(session.query(Etheur).all())
 #
